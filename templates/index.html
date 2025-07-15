@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Binance Alerts</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #000000;
+      --input-bg: #f1f1f1;
+      --accent: #00b4cc;
+      --table-bg: #fdfdfd;
+      --th-bg: #eee;
+      --triggered: #aaffaa;
+      --close: #ffff99;
+    }
+
+    .dark {
+      --bg: #121212;
+      --text: #eeeeee;
+      --input-bg: #2a2a2a;
+      --accent: #00e1ff;
+      --table-bg: #1c1c1c;
+      --th-bg: #222;
+      --triggered: #005500aa;
+      --close: #444400aa;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    h2 {
+      color: var(--accent);
+      border-bottom: 1px solid #444;
+      padding-bottom: 0.4rem;
+    }
+
+    .theme-toggle {
+      float: right;
+      background-color: var(--accent);
+      color: var(--bg);
+      padding: 0.4rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    form {
+      background-color: var(--table-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      box-shadow: 0 0 10px #00000020;
+    }
+
+    label {
+      display: block;
+      margin-top: 0.5rem;
+      font-weight: 600;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.3rem;
+      margin-bottom: 1rem;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      background-color: var(--input-bg);
+      color: var(--text);
+    }
+
+    button {
+      background-color: var(--accent);
+      color: var(--bg);
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background-color: var(--table-bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 0.8rem;
+      text-align: center;
+      border-bottom: 1px solid #444;
+    }
+
+    th {
+      background-color: var(--th-bg);
+      color: var(--accent);
+      cursor: pointer;
+    }
+
+    .close-to-target {
+      background-color: var(--close) !important;
+    }
+
+    .triggered {
+      background-color: var(--triggered) !important;
+    }
+
+    .current {
+      font-weight: bold;
+    }
+
+    .delete-btn {
+      background-color: #ff4d4d;
+      color: #fff;
+      padding: 0.3rem 0.7rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .delete-btn:hover {
+      background-color: #cc0000;
+    }
+
+    /* Мобильная адаптация */
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      form, table {
+        font-size: 14px;
+      }
+
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+
+      thead tr {
+        display: none;
+      }
+
+      tbody tr {
+        margin-bottom: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 0.5rem;
+      }
+
+      tbody tr td {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.3rem 0.5rem;
+        border-bottom: none;
+      }
+
+      tbody tr td:last-child {
+        justify-content: flex-end;
+      }
+
+      tbody tr td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        flex-basis: 40%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="toggleTheme()">🌙 Тема</button>
+
+  <h2>📊 Добавить сигнал</h2>
+  <form action="/add" method="post">
+    <label>Пара:</label>
+    <select name="symbol" required>
+      {% for s in available_symbols %}
+        <option value="{{ s }}">{{ s }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Целевая цена:</label>
+    <input name="price" type="number" step="any" required>
+
+    <label>Условие срабатывания:</label>
+    <select name="direction" required>
+      <option value="above" selected>Цена выше или равна цели</option>
+      <option value="below">Цена ниже или равна цели</option>
+    </select>
+
+    <label>Заметка:</label>
+    <input name="note" placeholder="Комментарий (необязательно)">
+
+    <button type="submit">Добавить</button>
+  </form>
+
+  <a href="/export">
+    <button style="margin-top: 10px;">📥 Экспорт в Excel</button>
+  </a>
+
+  <h2>📋 Активные сигналы</h2>
+  <table id="alerts-table">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">Пара ⬍</th>
+        <th onclick="sortTable(1)">Цель ⬍</th>
+        <th>Текущая</th>
+        <th>Заметка</th>
+        <th>Статус</th>
+        <th>Удалить</th>
+        <th>График</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr data-symbol="{{ a.symbol }}" class="{{ 'triggered' if a.triggered else '' }}">
+        <td data-label="Пара">{{ a.symbol }}</td>
+        <td data-label="Цель" class="target">
+          {{ a.target }} <br>
+          <small>({{ '≥' if a.direction == 'above' else '≤' }})</small>
+        </td>
+        <td data-label="Текущая" class="current">—</td>
+        <td data-label="Заметка">{{ a.note }}</td>
+        <td data-label="Статус">{{ '✅' if a.triggered else '⏳' }}</td>
+        <td data-label="Удалить">
+          <form action="/delete" method="post" style="margin:0;">
+            <input type="hidden" name="symbol" value="{{ a.symbol }}">
+            <input type="hidden" name="target" value="{{ a.target }}">
+            <input type="hidden" name="direction" value="{{ a.direction }}">
+            <button class="delete-btn" type="submit">✖</button>
+          </form>
+        </td>
+        <td data-label="График">
+          <canvas id="chart-{{ a.symbol }}" width="100" height="40"></canvas>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <audio id="alertSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" preload="auto"></audio>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    }
+
+    if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.add('dark');
+    }
+
+    async function fetchPrices() {
+      try {
+        const resp = await fetch('/prices');
+        const prices = await resp.json();
+        const rows = document.querySelectorAll('#alerts-table tbody tr');
+
+        rows.forEach(row => {
+          const symbol = row.getAttribute('data-symbol');
+          const target = parseFloat(row.querySelector('.target').textContent);
+          const current = prices[symbol];
+          const direction = row.querySelector('input[name="direction"]')?.value || row.dataset.direction || 'above';
+
+          if (current !== undefined) {
+            row.querySelector('.current').textContent = current.toFixed(6);
+
+            const diff = Math.abs(current - target) / target;
+            if (diff <= 0.01 && !row.classList.contains('triggered')) {
+              row.classList.add('close-to-target');
+            } else {
+              row.classList.remove('close-to-target');
+            }
+          }
+        });
+      } catch (e) {
+        console.error('Ошибка загрузки цен:', e);
+      }
+    }
+
+    function sortTable(index) {
+      const table = document.getElementById('alerts-table');
+      const tbody = table.tBodies[0];
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+
+      const sorted = rows.sort((a, b) => {
+        const aText = a.cells[index].textContent.trim();
+        const bText = b.cells[index].textContent.trim();
+        return isNaN(aText) ? aText.localeCompare(bText) : parseFloat(aText) - parseFloat(bText);
+      });
+
+      tbody.innerHTML = '';
+      sorted.forEach(row => tbody.appendChild(row));
+    }
+
+    async function fetchCandles(symbol) {
+      try {
+        const resp = await fetch(`/candles?symbol=${symbol}`);
+        return await resp.json();
+      } catch {
+        return null;
+      }
+    }
+
+    async function drawCharts() {
+      const rows = document.querySelectorAll('#alerts-table tbody tr');
+      for (const row of rows) {
+        const symbol = row.getAttribute('data-symbol');
+        const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
+        const candles = await fetchCandles(symbol);
+
+        if (!candles) continue;
+
+        const data = {
+          labels: candles.map(c => new Date(c[0]).toLocaleTimeString()),
+          datasets: [{
+            label: symbol,
+            data: candles.map(c => c[4]), // закрытие
+            borderColor: 'rgba(0, 180, 204, 1)',
+            backgroundColor: 'rgba(0, 180, 204, 0.2)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0,
+          }]
+        };
+
+        new Chart(ctx, {
+          type: 'line',
+          data: data,
+          options: {
+            responsive: false,
+            plugins: {legend: {display: false}},
+            scales: {
+              x: { display: false },
+              y: { display: false }
+            },
+            elements: {
+              line: { borderWidth: 2 }
+            }
+          }
+        });
+      }
+    }
+
+    async function updateSignals() {
+      try {
+        const resp = await fetch('/alerts_status');
+        const data = await resp.json();
+
+        data.forEach(alertStatus => {
+          const row = document.querySelector(`#alerts-table tbody tr[data-symbol="${alertStatus.symbol}"]`);
+          if (!row) return;
+          row.querySelector('.current').textContent = alertStatus.current ? alertStatus.current.toFixed(6) : '—';
+
+          if (!alertStatus.triggered) {
+            row.classList.remove('triggered');
+            const diff = Math.abs(alertStatus.current - alertStatus.target) / alertStatus.target;
+            if (diff <= 0.01) {
+              row.classList.add('close-to-target');
+            } else {
+              row.classList.remove('close-to-target');
+            }
+          } else {
+            row.classList.add('triggered');
+            document.getElementById('alertSound').play();
+          }
+        });
+      } catch (e) {
+        console.error('Ошибка обновления статуса сигналов:', e);
+      }
+    }
+
+    setInterval(fetchPrices, 5000);
+    fetchPrices();
+    setTimeout(drawCharts, 2000);
+  </script>
+</body>
+</html>
