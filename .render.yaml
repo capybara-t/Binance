@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: binance-alerts
+    env: python
+    buildCommand: ""
+    startCommand: bash start.sh
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: 7399314058:AAFyO-lvFaRSK8f68JzwSxZV6CrCYJI_xhc
+      - key: TELEGRAM_CHAT_ID
+        value: 280834578
