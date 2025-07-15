@@ -4,3 +4,4 @@ binance
 openpyxl
 cryptography
 requests
+aiohttp
