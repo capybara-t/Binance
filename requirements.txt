@@ -1,6 +1,6 @@
 flask
 python-telegram-bot==13.15
-binance
+python-binance
 openpyxl
 cryptography
 requests
